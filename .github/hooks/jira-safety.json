@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "bash .github/hooks/scripts/validate-jira-safety.sh",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .github/hooks/scripts/Validate-JiraSafety.ps1",
+        "timeout": 10
+      }
+    ]
+  }
+}

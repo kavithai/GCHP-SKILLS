@@ -53,3 +53,5 @@ jiraauthtype=Basic
 * Check `$LASTEXITCODE` after each script run.
 * `0` means success and `1` means failure.
 * DELETE operations are blocked by design and not supported.
+* Safety rules are enforced by a PreToolUse hook at `.github/hooks/jira-safety.json` — dangerous operations are blocked before tool execution
+* Protected files (`shared.psm1`, hook scripts, safety instructions) cannot be modified by Copilot agents

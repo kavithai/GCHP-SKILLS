@@ -79,15 +79,17 @@ When using this skill from an agent runtime:
 | Delete project    | DELETE      | Entire project destruction  |
 | Delete attachment | DELETE      | Permanent data loss         |
 
-### Three-Layer DELETE Blocking
+### Five-Layer DELETE Blocking
 
-DELETE operations are blocked at three independent layers to prevent accidental or deliberate data destruction:
+DELETE operations are blocked at five independent layers to prevent accidental or deliberate data destruction:
 
 1. `Invoke-JiraApi` validates the `-Method` parameter using `[ValidateSet('Get', 'Post', 'Put')]`, rejecting DELETE at the parameter binding level.
 2. A runtime guard inside `Invoke-JiraApi` checks the method string and throws before any HTTP request is made.
 3. No script in this skill constructs a DELETE request. No code path exists to reach a DELETE call.
+4. A VS Code Copilot `PreToolUse` hook at `.github/hooks/jira-safety.json` inspects every tool invocation before execution. On Windows, the hook's PowerShell script (`Validate-JiraSafety.ps1`) enforces these checks; on macOS/Linux, an equivalent Python-based bash script (`validate-jira-safety.sh`) provides the same enforcement. Both variants block DELETE method patterns (`-Method Delete`, `curl -X DELETE`), direct API bypass attempts, script tampering, and protected file deletion. This layer operates at the Copilot agent level, before any terminal command or file edit runs.
+5. A workspace-wide instructions file at `.github/instructions/jira-safety.instructions.md` teaches the Copilot agent to proactively avoid DELETE operations and direct API bypass attempts. This soft guidance layer reduces the frequency of blocked operations.
 
-All three layers must be bypassed simultaneously for a DELETE to succeed, which requires modifying the source code itself.
+All five layers must be bypassed simultaneously for a DELETE to succeed.
 
 ### Empty Field Protection
 

@@ -1,5 +1,5 @@
 ---
-description: "Safety rules for Jira operations â€” blocks DELETE and protects skill integrity"
+description: "Safety rules for Jira operations — blocks DELETE and protects skill integrity"
 applyTo: "**"
 ---
 
@@ -20,11 +20,12 @@ applyTo: "**"
 
 Do not modify these files:
 
-* .github/skills/jira-user-stories/scripts/shared.psm1 â€” contains safety-critical ValidateSet and runtime DELETE guard
-* .github/hooks/scripts/Validate-JiraSafety.ps1 â€” PreToolUse hook enforcement script
-* .github/hooks/jira-safety.json â€” hook configuration
-* .github/instructions/jira-safety.instructions.md â€” this file
+* .github/skills/jira-user-stories/scripts/shared.psm1 — contains safety-critical ValidateSet and runtime DELETE guard
+* .github/hooks/scripts/Validate-JiraSafety.ps1 — Windows PreToolUse hook enforcement script
+* .github/hooks/scripts/validate-jira-safety.sh — macOS/Linux PreToolUse hook enforcement script
+* .github/hooks/jira-safety.json — hook configuration
+* .github/instructions/jira-safety.instructions.md — this file
 
 ## Enforcement
 
-These rules are enforced by a PreToolUse hook at .github/hooks/jira-safety.json. On Windows, the hook runs a PowerShell validation script that blocks violations before tool execution. On non-Windows platforms, the hook uses a passthrough script that allows all operations (full non-Windows enforcement is not yet implemented). The hook operates as the fourth and fifth defense layers above the existing three-layer DELETE blocking in shared.psm1.
+These rules are enforced by a PreToolUse hook at .github/hooks/jira-safety.json. On Windows, the hook runs a PowerShell validation script (`Validate-JiraSafety.ps1`) that blocks violations before tool execution. On macOS/Linux, an equivalent Python-based bash script (`validate-jira-safety.sh`) provides the same enforcement. The hook operates as the fourth and fifth defense layers above the existing three-layer DELETE blocking in shared.psm1.

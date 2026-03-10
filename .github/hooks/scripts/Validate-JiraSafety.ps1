@@ -10,6 +10,7 @@
     $protectedFiles = @(
         'shared.psm1',
         'Validate-JiraSafety.ps1',
+        'validate-jira-safety.sh',
         'jira-safety.json',
         'jira-safety.instructions.md'
     )

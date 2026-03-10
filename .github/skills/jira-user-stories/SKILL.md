@@ -86,10 +86,10 @@ DELETE operations are blocked at five independent layers to prevent accidental o
 1. `Invoke-JiraApi` validates the `-Method` parameter using `[ValidateSet('Get', 'Post', 'Put')]`, rejecting DELETE at the parameter binding level.
 2. A runtime guard inside `Invoke-JiraApi` checks the method string and throws before any HTTP request is made.
 3. No script in this skill constructs a DELETE request. No code path exists to reach a DELETE call.
-4. A VS Code Copilot `PreToolUse` hook at `.github/hooks/jira-safety.json` inspects every tool invocation before execution. The hook's PowerShell script blocks DELETE method patterns (`-Method Delete`, `curl -X DELETE`), direct API bypass attempts, script tampering, and protected file deletion. This layer operates at the Copilot agent level, before any terminal command or file edit runs.
+4. A VS Code Copilot `PreToolUse` hook at `.github/hooks/jira-safety.json` inspects every tool invocation before execution. On Windows agent runtimes, the hook's PowerShell script blocks DELETE method patterns (`-Method Delete`, `curl -X DELETE`), direct API bypass attempts, script tampering, and protected file deletion. On non-Windows platforms, the hook currently uses a passthrough script and does not enforce these protections. This layer operates at the Copilot agent level, before any terminal command or file edit runs.
 5. A workspace-wide instructions file at `.github/instructions/jira-safety.instructions.md` teaches the Copilot agent to proactively avoid DELETE operations and direct API bypass attempts. This soft guidance layer reduces the frequency of blocked operations.
 
-All five layers must be bypassed simultaneously for a DELETE to succeed.
+On Windows agent runtimes, all five layers must be bypassed simultaneously for a DELETE to succeed. On non-Windows platforms, layers 1–3 remain active; layers 4–5 rely on the instructions file guidance until full cross-platform hook enforcement is implemented.
 
 ### Empty Field Protection
 

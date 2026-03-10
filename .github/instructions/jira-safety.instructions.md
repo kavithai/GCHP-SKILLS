@@ -1,5 +1,5 @@
 ---
-description: "Safety rules for Jira operations â€” blocks DELETE and protects skill integrity"
+description: "Safety rules for Jira operations — blocks DELETE and protects skill integrity"
 applyTo: "**"
 ---
 
@@ -20,10 +20,10 @@ applyTo: "**"
 
 Do not modify these files:
 
-* .github/skills/jira-user-stories/scripts/shared.psm1 â€” contains safety-critical ValidateSet and runtime DELETE guard
-* .github/hooks/scripts/Validate-JiraSafety.ps1 â€” PreToolUse hook enforcement script
-* .github/hooks/jira-safety.json â€” hook configuration
-* .github/instructions/jira-safety.instructions.md â€” this file
+* .github/skills/jira-user-stories/scripts/shared.psm1 — contains safety-critical ValidateSet and runtime DELETE guard
+* .github/hooks/scripts/Validate-JiraSafety.ps1 — PreToolUse hook enforcement script
+* .github/hooks/jira-safety.json — hook configuration
+* .github/instructions/jira-safety.instructions.md — this file
 
 ## Enforcement
 

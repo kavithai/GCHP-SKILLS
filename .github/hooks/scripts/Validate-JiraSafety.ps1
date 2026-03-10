@@ -42,7 +42,7 @@
         'run_in_terminal' {
             $command = $toolInput.command
 
-            # Category 1 â€” DELETE method patterns
+            # Category 1 — DELETE method patterns
             if ($command -imatch '-Method\s+[''"]?Delete[''"]?') {
                 Write-HookResult -Decision 'deny' -Reason 'DELETE HTTP method detected. DELETE operations are blocked by security policy.'
                 exit 0
@@ -60,7 +60,7 @@
                 exit 0
             }
 
-            # Category 5 â€” Protected file deletion/overwrite via terminal
+            # Category 5 — Protected file deletion/overwrite via terminal
             foreach ($name in $protectedFiles) {
                 $escapedName = [regex]::Escape($name)
                 if ($command -imatch "Remove-Item.*$escapedName") {
@@ -68,6 +68,10 @@
                     exit 0
                 }
                 if ($command -imatch "del\s+.*$escapedName") {
+                    Write-HookResult -Decision 'deny' -Reason "Blocked attempt to delete protected file: $name"
+                    exit 0
+                }
+                if ($command -imatch "rm\s+.*$escapedName") {
                     Write-HookResult -Decision 'deny' -Reason "Blocked attempt to delete protected file: $name"
                     exit 0
                 }
@@ -82,7 +86,7 @@
         }
 
         'replace_string_in_file' {
-            # Category 3 â€” Script tampering
+            # Category 3 — Script tampering
             $matched = Test-ProtectedFile -FilePath $toolInput.filePath
             if ($matched) {
                 Write-HookResult -Decision 'deny' -Reason "Blocked attempt to modify protected file: $matched"
@@ -93,7 +97,7 @@
         }
 
         'multi_replace_string_in_file' {
-            # Category 3 â€” Script tampering (check each replacement)
+            # Category 3 — Script tampering (check each replacement)
             if ($toolInput.replacements) {
                 foreach ($replacement in $toolInput.replacements) {
                     $matched = Test-ProtectedFile -FilePath $replacement.filePath
@@ -108,7 +112,7 @@
         }
 
         'create_file' {
-            # Category 3 â€” Protected file overwrite via create
+            # Category 3 — Protected file overwrite via create
             $matched = Test-ProtectedFile -FilePath $toolInput.filePath
             if ($matched) {
                 Write-HookResult -Decision 'deny' -Reason "Blocked attempt to overwrite protected file: $matched"
@@ -147,6 +151,12 @@
     }
 }
 catch {
-    Write-Error "Validate-JiraSafety hook error: $_"
-    exit 2
+    @{
+        hookSpecificOutput = @{
+            hookEventName            = 'PreToolUse'
+            permissionDecision       = 'deny'
+            permissionDecisionReason = "Validate-JiraSafety hook error: $($_.Exception.Message)"
+        }
+    } | ConvertTo-Json -Depth 5 -Compress
+    exit 0
 }

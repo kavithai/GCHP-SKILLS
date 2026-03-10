@@ -381,6 +381,11 @@ System.Object
         throw "HTTPS is required. Refusing to send credentials over non-HTTPS URL: $(Get-SanitizedErrorMessage -Message $fullUrl)"
     }
 
+    # SSRF protection: block localhost, loopback, and private IP ranges
+    if (-not (Test-JiraUrl -Url $fullUrl)) {
+        throw "Blocked: URL '$($fullUrl -replace '\?.*', '')' targets a disallowed host (localhost, loopback, or private IP range)."
+    }
+
     # TLS 1.2 pinning
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -397,6 +402,7 @@ System.Object
 
     # Retry loop with exponential backoff
     $maxRetries = 3
+    $max429Retries = 10
     $attempt = 0
 
     while ($true) {
@@ -425,8 +431,11 @@ System.Object
                 $statusCode = [int]$_.Exception.Response.StatusCode
             }
 
-            # Handle 429 Too Many Requests
+            # Handle 429 Too Many Requests (max 10 retries to prevent infinite loop)
             if ($statusCode -eq 429) {
+                if ($attempt -ge $max429Retries) {
+                    throw "Rate limited (429) after $max429Retries retries. Giving up."
+                }
                 $retryAfter = $null
                 try {
                     $retryAfter = $_.Exception.Response.Headers['Retry-After']

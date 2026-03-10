@@ -60,15 +60,17 @@ if ($MyInvocation.InvocationName -ne '.') {
         $creds = Get-JiraCredentials
 
         # Build assignee body
+        # Jira Cloud (Basic auth) uses accountId; Server/DC uses name
+        $assigneeField = if ($creds['jiraauthtype'] -ieq 'Basic') { 'accountId' } else { 'name' }
         if ($hasUnassign) {
             $assigneeBody = @{
-                name = $null
+                $assigneeField = $null
             }
             $actionDescription = 'Unassigning'
         }
         else {
             $assigneeBody = @{
-                name = $Assignee
+                $assigneeField = $Assignee
             }
             $actionDescription = "Assigning to '$Assignee'"
         }

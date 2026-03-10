@@ -109,8 +109,10 @@ if ($MyInvocation.InvocationName -ne '.') {
         }
 
         if ($PSBoundParameters.ContainsKey('Assignee') -and $Assignee) {
+            # Jira Cloud (Basic auth) uses accountId; Server/DC uses name
+            $assigneeField = if ($creds['jiraauthtype'] -ieq 'Basic') { 'accountId' } else { 'name' }
             $fields['assignee'] = @{
-                name = $Assignee
+                $assigneeField = $Assignee
             }
         }
 

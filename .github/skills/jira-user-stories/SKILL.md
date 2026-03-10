@@ -1,29 +1,36 @@
 ---
 name: jira-user-stories
-description: 'Jira user story management skill for reading, creating, updating, and transitioning issues via Jira REST API v2. USE FOR: Jira issue search, story creation, status updates, field editing, comment management, issue assignment, JQL queries, sprint tracking. Works with PowerShell 5.1+ on Windows. Supports both Jira Cloud (Basic Auth) and Data Center (Bearer PAT). Enforces strict safety guardrails: no DELETE operations, HTTPS-only, TLS 1.2 pinned, credential masking.'
+description: 'Jira user story management skill for reading, creating, updating, and transitioning issues via Jira REST API v2. USE FOR: Jira issue search, story creation, status updates, field editing, comment management, issue assignment, JQL queries, sprint tracking. Works cross-platform: PowerShell 5.1+ on Windows, bash/curl/python3 on macOS and Linux. Supports both Jira Cloud (Basic Auth) and Data Center (Bearer PAT). Enforces strict safety guardrails: no DELETE operations, HTTPS-only, TLS 1.2 pinned, credential masking.'
 user-invocable: true
-compatibility: 'PowerShell 5.1+ (Windows built-in). Jira REST API v2 access over HTTPS. PAT stored in .env or credentials.env at workspace root.'
+compatibility: 'Cross-platform: PowerShell 5.1+ (Windows) or bash 3.2+/curl/python3 (macOS/Linux). Jira REST API v2 access over HTTPS. PAT stored in .env or credentials.env at workspace root.'
 ---
 
 # Jira User Story Management Skill
 
 ## Overview
 
-Provides Jira issue management capabilities through PowerShell scripts that interact with the Jira REST API v2. All operations enforce HTTPS, TLS 1.2 pinning, credential masking, and a permanent DELETE block.
+Provides Jira issue management capabilities through scripts that interact with the Jira REST API v2. Two runtime options are available:
+
+* **PowerShell scripts** (`scripts/*.ps1`) — for Windows and PowerShell 7+ environments.
+* **Bash scripts** (`scripts/bash/*.sh`) — for macOS and Linux (uses `curl`, `python3`, and `base64`).
+
+All operations enforce HTTPS, TLS 1.2 pinning, credential masking, and a permanent DELETE block.
 
 ### Supported Operations
 
-| Operation          | Script                  | HTTP Method | Endpoint                              |
-|--------------------|-------------------------|-------------|---------------------------------------|
-| Search issues      | Search-JiraIssues.ps1   | GET         | /rest/api/2/search                    |
-| Get single issue   | Get-JiraIssue.ps1       | GET         | /rest/api/2/issue/{key}               |
-| Create issue       | New-JiraIssue.ps1       | POST        | /rest/api/2/issue                     |
-| Update issue       | Update-JiraIssue.ps1    | PUT         | /rest/api/2/issue/{key}               |
-| Add comment        | Add-JiraComment.ps1     | POST        | /rest/api/2/issue/{key}/comment       |
-| Transition status  | Set-JiraTransition.ps1  | POST        | /rest/api/2/issue/{key}/transitions   |
-| Assign issue       | Set-JiraAssignee.ps1    | PUT         | /rest/api/2/issue/{key}/assignee      |
+| Operation          | PowerShell Script       | Bash Script               | HTTP Method | Endpoint                              |
+|--------------------|-------------------------|---------------------------|-------------|---------------------------------------|
+| Search issues      | Search-JiraIssues.ps1   | search-jira-issues.sh     | GET         | /rest/api/2/search                    |
+| Get single issue   | Get-JiraIssue.ps1       | get-jira-issue.sh         | GET         | /rest/api/2/issue/{key}               |
+| Create issue       | New-JiraIssue.ps1       | new-jira-issue.sh         | POST        | /rest/api/2/issue                     |
+| Update issue       | Update-JiraIssue.ps1    | update-jira-issue.sh      | PUT         | /rest/api/2/issue/{key}               |
+| Add comment        | Add-JiraComment.ps1     | add-jira-comment.sh       | POST        | /rest/api/2/issue/{key}/comment       |
+| Transition status  | Set-JiraTransition.ps1  | set-jira-transition.sh    | POST        | /rest/api/2/issue/{key}/transitions   |
+| Assign issue       | Set-JiraAssignee.ps1    | set-jira-assignee.sh      | PUT         | /rest/api/2/issue/{key}/assignee      |
 
 ## Prerequisites
+
+### Windows (PowerShell)
 
 | Requirement | Detail                                                                                     |
 |-------------|--------------------------------------------------------------------------------------------|
@@ -32,7 +39,21 @@ Provides Jira issue management capabilities through PowerShell scripts that inte
 | Credentials | `.env` or `credentials.env` at workspace root with `jirapat=<PAT>` and `jiraurl=<URL>`    |
 | Optional    | `jiraemail=<email>` for Jira Cloud (Basic Auth), `jiraauthtype=Basic`                      |
 
+### macOS / Linux (Bash)
+
+| Requirement | Detail                                                                                     |
+|-------------|--------------------------------------------------------------------------------------------|
+| bash        | 3.2+ (macOS built-in) or any modern bash                                                  |
+| curl        | Built-in on macOS and most Linux distributions                                             |
+| python3     | Built-in on macOS (via Xcode CLT) and most Linux distributions                            |
+| base64      | Built-in on macOS and Linux                                                                |
+| Jira Access | REST API v2 over HTTPS                                                                    |
+| Credentials | `.env` or `credentials.env` at workspace root with `jirapat=<PAT>` and `jiraurl=<URL>`    |
+| Optional    | `jiraemail=<email>` for Jira Cloud (Basic Auth), `jiraauthtype=Basic`                      |
+
 ## Quick Start
+
+### PowerShell (Windows)
 
 Retrieve a single issue with a clean, readable summary (recommended for agents):
 
@@ -54,19 +75,59 @@ Transition an issue to a new status:
 
     powershell -ExecutionPolicy Bypass -File scripts/Set-JiraTransition.ps1 -IssueKey "MYPROJ-123" -TransitionName "In Progress"
 
+### Bash (macOS / Linux)
+
+Retrieve a single issue with a clean, readable summary (recommended for agents):
+
+    bash scripts/bash/get-jira-issue.sh --issue-key "MYPROJ-123" --format summary
+
+Search for issues and get a formatted table:
+
+    bash scripts/bash/search-jira-issues.sh --jql "project = MYPROJ AND status = 'To Do'" --max-results 10 --format summary
+
+Retrieve raw JSON (for programmatic use):
+
+    bash scripts/bash/get-jira-issue.sh --issue-key "MYPROJ-123"
+
+Create a new user story:
+
+    bash scripts/bash/new-jira-issue.sh --project-key "MYPROJ" --summary "New user story" --issue-type "Story"
+
+Transition an issue to a new status:
+
+    bash scripts/bash/set-jira-transition.sh --issue-key "MYPROJ-123" --transition-name "In Progress"
+
 ## Agent Execution Rules (Required)
 
 When using this skill from an agent runtime:
 
+### Platform Detection
+
+* On macOS or Linux (no PowerShell), use the bash scripts: `bash scripts/bash/<script>.sh`
+* On Windows, use PowerShell: `powershell -ExecutionPolicy Bypass -File scripts/<script>.ps1`
+* On PowerShell 7+ (including non-Windows), use `pwsh -File scripts/<script>.ps1`.
+
+### Windows (PowerShell)
+
 * For maximum Windows compatibility, run scripts via:
   * `powershell -ExecutionPolicy Bypass -File scripts/<script>.ps1`
   * or set once per terminal: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
-* On PowerShell 7+ (including non-Windows), use `pwsh -File scripts/<script>.ps1`.
-* Always check exit codes (`$LASTEXITCODE`) after script execution. Exit code 0 indicates success; exit code 1 indicates failure.
-* **Prefer `-Format Summary`** for read operations (`Get-JiraIssue.ps1`, `Search-JiraIssues.ps1`). This returns a concise markdown summary that can be shown to the user directly — no JSON parsing needed.
+* **Prefer `-Format Summary`** for read operations. This returns a concise markdown summary.
 * Use default JSON format (`-Format Json` or omit the flag) only when programmatic field extraction is required.
 * When using JSON format, parse output from stdout. All scripts emit JSON via `ConvertTo-Json -Depth 10`.
 * Use `ConvertTo-SafeJqlValue` from `shared.psm1` when constructing JQL with user-supplied values to prevent injection.
+
+### macOS / Linux (Bash)
+
+* Run scripts via: `bash scripts/bash/<script>.sh`
+* **Prefer `--format summary`** for read operations. This returns a concise markdown summary.
+* Use default JSON format (`--format json` or omit the flag) only when programmatic field extraction is required.
+* Bash scripts use `--kebab-case` flags instead of PowerShell `-PascalCase` flags.
+* Requires `curl`, `python3`, and `base64` (all pre-installed on macOS and most Linux).
+
+### Common Rules
+
+* Always check exit codes (`$?`) after script execution. Exit code 0 indicates success; exit code 1 indicates failure.
 
 ## Safety Policy (Mandatory)
 
@@ -83,22 +144,30 @@ When using this skill from an agent runtime:
 
 DELETE operations are blocked at three independent layers to prevent accidental or deliberate data destruction:
 
+**PowerShell:**
+
 1. `Invoke-JiraApi` validates the `-Method` parameter using `[ValidateSet('Get', 'Post', 'Put')]`, rejecting DELETE at the parameter binding level.
 2. A runtime guard inside `Invoke-JiraApi` checks the method string and throws before any HTTP request is made.
+3. No script in this skill constructs a DELETE request. No code path exists to reach a DELETE call.
+
+**Bash:**
+
+1. `invoke_jira_api` validates the method against an allow-list (`GET|POST|PUT`), rejecting DELETE.
+2. A runtime guard checks the method string and exits before any HTTP request is made.
 3. No script in this skill constructs a DELETE request. No code path exists to reach a DELETE call.
 
 All three layers must be bypassed simultaneously for a DELETE to succeed, which requires modifying the source code itself.
 
 ### Empty Field Protection
 
-The `Update-JiraIssue.ps1` script prevents blanking the `summary` field. If `-Summary` is provided, it must contain non-whitespace content. At least one update field must be specified for any update operation.
+Both the PowerShell `Update-JiraIssue.ps1` and the bash `update-jira-issue.sh` scripts prevent blanking the `summary` field. If summary is provided, it must contain non-whitespace content. At least one update field must be specified for any update operation.
 
 ## Credentials Policy (Mandatory)
 
 * NEVER hardcode usernames, passwords, tokens, or secrets in any file.
 * Read credentials from `.env` or `credentials.env` at the workspace root only.
 * Never log or echo PAT values in terminal output. All error messages pass through `Get-SanitizedErrorMessage` to redact tokens.
-* Credentials are auto-cleared in the `finally` block after each operation: the `jirapat` value is set to `$null` and the credentials hashtable is removed from scope.
+* Credentials are auto-cleared in the `finally` block (PowerShell) or `trap` handler (bash) after each operation.
 * Recommended: use a dedicated service account with minimal Jira permissions scoped to required projects.
 * Recommended: rotate your PAT every 90 days.
 
@@ -115,95 +184,114 @@ When `jiraauthtype` is omitted or set to `Bearer`, the skill sends a `Bearer <PA
 
 ## Parameters Reference
 
-### Get-JiraIssue
+Bash scripts use `--kebab-case` flags. PowerShell scripts use `-PascalCase` flags. The tables below show both.
 
-| Parameter         | Flag               | Type     | Mandatory | Default | Description                                              |
-|-------------------|---------------------|----------|-----------|---------|----------------------------------------------------------|
-| Issue Key         | `-IssueKey`        | string   | Yes       | â€”       | Jira issue key (e.g., `PROJ-123`)                        |
-| Fields            | `-Fields`          | string[] | No        | All     | Specific fields to retrieve                              |
-| Include Comments  | `-IncludeComments` | switch   | No        | `$false`| Also retrieve comments for the issue                     |
-| Expand            | `-Expand`          | string[] | No        | â€”       | Expand options (`renderedFields`, `changelog`, etc.)     || Format            | `-Format`          | string   | No        | `Json`  | Output format: `Json` (full API response) or `Summary` (clean markdown) |
-### Search-JiraIssues
+### Get-JiraIssue / get-jira-issue
 
-| Parameter    | Flag           | Type     | Mandatory | Default                                 | Description                                  |
-|--------------|----------------|----------|-----------|-----------------------------------------|----------------------------------------------|
-| JQL          | `-Jql`         | string   | Yes       | â€”                                       | JQL query string                             |
-| Fields       | `-Fields`      | string[] | No        | `summary,status,assignee,priority`      | Fields to return                             |
-| Max Results  | `-MaxResults`  | int      | No        | `50`                                    | Results per page (max 100)                   |
-| Start At     | `-StartAt`     | int      | No        | `0`                                     | Pagination offset                            |
-| All          | `-All`         | switch   | No        | `$false`                                | Paginate through all results (capped at 500) |
-| Format       | `-Format`      | string   | No        | `Json`                                  | Output format: `Json` (full response) or `Summary` (markdown table) |
+| Parameter         | PowerShell Flag    | Bash Flag            | Type     | Mandatory | Default | Description                                              |
+|-------------------|--------------------|----------------------|----------|-----------|---------|----------------------------------------------------------|
+| Issue Key         | `-IssueKey`        | `--issue-key`        | string   | Yes       | —       | Jira issue key (e.g., `PROJ-123`)                        |
+| Fields            | `-Fields`          | `--fields`           | string[] | No        | All     | Specific fields to retrieve (comma-separated)            |
+| Include Comments  | `-IncludeComments` | `--include-comments` | switch   | No        | false   | Also retrieve comments for the issue                     |
+| Expand            | `-Expand`          | `--expand`           | string[] | No        | —       | Expand options (`renderedFields`, `changelog`, etc.)     |
+| Format            | `-Format`          | `--format`           | string   | No        | Json    | Output format: `json` or `summary` (clean markdown)      |
 
-### New-JiraIssue
+### Search-JiraIssues / search-jira-issues
 
-| Parameter      | Flag             | Type      | Mandatory | Default | Description                                 |
-|----------------|------------------|-----------|-----------|---------|---------------------------------------------|
-| Project Key    | `-ProjectKey`    | string    | Yes       | â€”       | Jira project key (e.g., `MYPROJ`)           |
-| Summary        | `-Summary`       | string    | Yes       | â€”       | Issue summary/title (must not be empty)      |
-| Description    | `-Description`   | string    | No        | â€”       | Issue description                           |
-| Issue Type     | `-IssueType`     | string    | No        | `Story` | Issue type (`Story`, `Task`, `Bug`, `Epic`) |
-| Priority       | `-Priority`      | string    | No        | â€”       | Priority name (e.g., `High`, `Medium`)      |
-| Labels         | `-Labels`        | string[]  | No        | â€”       | Labels to apply                             |
-| Assignee       | `-Assignee`      | string    | No        | â€”       | Assignee username or account ID             |
-| Custom Fields  | `-CustomFields`  | hashtable | No        | â€”       | Custom fields as key-value pairs            |
+| Parameter    | PowerShell Flag | Bash Flag       | Type     | Mandatory | Default                            | Description                                  |
+|--------------|-----------------|-----------------|----------|-----------|------------------------------------|----------------------------------------------|
+| JQL          | `-Jql`          | `--jql`         | string   | Yes       | —                                  | JQL query string                             |
+| Fields       | `-Fields`       | `--fields`      | string[] | No        | `summary,status,assignee,priority` | Fields to return (comma-separated)           |
+| Max Results  | `-MaxResults`   | `--max-results` | int      | No        | `50`                               | Results per page (max 100)                   |
+| Start At     | `-StartAt`      | `--start-at`    | int      | No        | `0`                                | Pagination offset                            |
+| All          | `-All`          | `--all`         | switch   | No        | false                              | Paginate through all results (capped at 500) |
+| Format       | `-Format`       | `--format`      | string   | No        | Json                               | Output format: `json` or `summary`           |
 
-### Update-JiraIssue
+### New-JiraIssue / new-jira-issue
 
-| Parameter      | Flag             | Type      | Mandatory | Default | Description                                      |
-|----------------|------------------|-----------|-----------|---------|--------------------------------------------------|
-| Issue Key      | `-IssueKey`      | string    | Yes       | â€”       | Jira issue key to update                         |
-| Summary        | `-Summary`       | string    | No        | â€”       | New summary (must not be blank if provided)      |
-| Description    | `-Description`   | string    | No        | â€”       | New description                                  |
-| Priority       | `-Priority`      | string    | No        | â€”       | New priority name                                |
-| Labels         | `-Labels`        | string[]  | No        | â€”       | New labels (replaces existing)                   |
-| Custom Fields  | `-CustomFields`  | hashtable | No        | â€”       | Custom fields to update                          |
+| Parameter      | PowerShell Flag  | Bash Flag        | Type      | Mandatory | Default | Description                                 |
+|----------------|------------------|------------------|-----------|-----------|---------|---------------------------------------------|
+| Project Key    | `-ProjectKey`    | `--project-key`  | string    | Yes       | —       | Jira project key (e.g., `MYPROJ`)           |
+| Summary        | `-Summary`       | `--summary`      | string    | Yes       | —       | Issue summary/title (must not be empty)      |
+| Description    | `-Description`   | `--description`  | string    | No        | —       | Issue description                           |
+| Issue Type     | `-IssueType`     | `--issue-type`   | string    | No        | `Story` | Issue type (`Story`, `Task`, `Bug`, `Epic`) |
+| Priority       | `-Priority`      | `--priority`     | string    | No        | —       | Priority name (e.g., `High`, `Medium`)      |
+| Labels         | `-Labels`        | `--labels`       | string[]  | No        | —       | Labels (comma-separated for bash)           |
+| Assignee       | `-Assignee`      | `--assignee`     | string    | No        | —       | Assignee username or account ID             |
+| Custom Fields  | `-CustomFields`  | —                | hashtable | No        | —       | Custom fields (PowerShell only)             |
 
-### Add-JiraComment
+### Update-JiraIssue / update-jira-issue
 
-| Parameter   | Flag           | Type      | Mandatory | Default | Description                                                        |
-|-------------|----------------|-----------|-----------|---------|--------------------------------------------------------------------|
-| Issue Key   | `-IssueKey`    | string    | Yes       | â€”       | Issue to comment on                                                |
-| Body        | `-Body`        | string    | Yes       | â€”       | Comment text (plain text or wiki markup)                           |
-| Visibility  | `-Visibility`  | hashtable | No        | â€”       | Visibility restriction (e.g., `@{type='role'; value='Developers'}`) |
+| Parameter      | PowerShell Flag  | Bash Flag        | Type      | Mandatory | Default | Description                                      |
+|----------------|------------------|------------------|-----------|-----------|---------|--------------------------------------------------|
+| Issue Key      | `-IssueKey`      | `--issue-key`    | string    | Yes       | —       | Jira issue key to update                         |
+| Summary        | `-Summary`       | `--summary`      | string    | No        | —       | New summary (must not be blank if provided)      |
+| Description    | `-Description`   | `--description`  | string    | No        | —       | New description                                  |
+| Priority       | `-Priority`      | `--priority`     | string    | No        | —       | New priority name                                |
+| Labels         | `-Labels`        | `--labels`       | string[]  | No        | —       | New labels (comma-separated for bash)            |
+| Custom Fields  | `-CustomFields`  | —                | hashtable | No        | —       | Custom fields (PowerShell only)                  |
 
-### Set-JiraTransition
+### Add-JiraComment / add-jira-comment
 
-| Parameter        | Flag                | Type   | Mandatory | Default  | Description                                    |
-|------------------|---------------------|--------|-----------|----------|------------------------------------------------|
-| Issue Key        | `-IssueKey`         | string | Yes       | â€”        | Issue to transition                            |
-| Transition ID    | `-TransitionId`     | string | No        | â€”        | ID of the transition to execute                |
-| Transition Name  | `-TransitionName`   | string | No        | â€”        | Name of the transition (resolved to ID)        |
-| List Transitions | `-ListTransitions`  | switch | No        | `$false` | List available transitions instead of executing|
-| Comment          | `-Comment`          | string | No        | â€”        | Comment to add with the transition             |
+| Parameter   | PowerShell Flag | Bash Flag      | Type      | Mandatory | Default | Description                                                        |
+|-------------|-----------------|----------------|-----------|-----------|---------|--------------------------------------------------------------------| 
+| Issue Key   | `-IssueKey`     | `--issue-key`  | string    | Yes       | —       | Issue to comment on                                                |
+| Body        | `-Body`         | `--body`       | string    | Yes       | —       | Comment text (plain text or wiki markup)                           |
+| Visibility  | `-Visibility`   | —              | hashtable | No        | —       | Visibility restriction (PowerShell only)                           |
 
-Provide either `-TransitionId` or `-TransitionName` to execute a transition. Use `-ListTransitions` to discover available transitions before executing one. When both `-TransitionName` and `-TransitionId` are omitted without `-ListTransitions`, the script throws an error.
+### Set-JiraTransition / set-jira-transition
 
-### Set-JiraAssignee
+| Parameter        | PowerShell Flag     | Bash Flag              | Type   | Mandatory | Default | Description                                    |
+|------------------|---------------------|------------------------|--------|-----------|---------|------------------------------------------------|
+| Issue Key        | `-IssueKey`         | `--issue-key`          | string | Yes       | —       | Issue to transition                            |
+| Transition ID    | `-TransitionId`     | `--transition-id`      | string | No        | —       | ID of the transition to execute                |
+| Transition Name  | `-TransitionName`   | `--transition-name`    | string | No        | —       | Name of the transition (resolved to ID)        |
+| List Transitions | `-ListTransitions`  | `--list-transitions`   | switch | No        | false   | List available transitions instead of executing|
+| Comment          | `-Comment`          | `--comment`            | string | No        | —       | Comment to add with the transition             |
 
-| Parameter | Flag          | Type   | Mandatory | Default  | Description                                     |
-|-----------|---------------|--------|-----------|----------|-------------------------------------------------|
-| Issue Key | `-IssueKey`   | string | Yes       | â€”        | Issue to assign                                 |
-| Assignee  | `-Assignee`   | string | No        | â€”        | Username or account ID to assign                |
-| Unassign  | `-Unassign`   | switch | No        | `$false` | Remove the current assignee                     |
+Provide either transition ID or transition name to execute a transition. Use the list option to discover available transitions before executing one.
+
+### Set-JiraAssignee / set-jira-assignee
+
+| Parameter | PowerShell Flag | Bash Flag      | Type   | Mandatory | Default | Description                                     |
+|-----------|-----------------|----------------|--------|-----------|---------|--------------------------------------------------|
+| Issue Key | `-IssueKey`     | `--issue-key`  | string | Yes       | —       | Issue to assign                                 |
+| Assignee  | `-Assignee`     | `--assignee`   | string | No        | —       | Username or account ID to assign                |
+| Unassign  | `-Unassign`     | `--unassign`   | switch | No        | false   | Remove the current assignee                     |
 
 ## Workflow Pattern for Agents
 
 ### Read Operations (single command, no parsing needed)
 
-Use `-Format Summary` to get clean, user-ready output in a single step:
+Use summary format to get clean, user-ready output in a single step:
 
-1. Set execution policy (Windows recommended): `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+**PowerShell (Windows):**
+
+1. Set execution policy: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
 2. Get issue summary: `Get-JiraIssue.ps1 -IssueKey "PROJ-123" -Format Summary`
 3. Search issues: `Search-JiraIssues.ps1 -Jql "project = PROJ AND status = 'To Do'" -Format Summary`
+
+**Bash (macOS / Linux):**
+
+1. Get issue summary: `bash scripts/bash/get-jira-issue.sh --issue-key "PROJ-123" --format summary`
+2. Search issues: `bash scripts/bash/search-jira-issues.sh --jql "project = PROJ AND status = 'To Do'" --format summary`
 
 The output is clean markdown that can be returned to the user directly — no JSON parsing or field extraction required.
 
 ### Write Operations (standard workflow)
 
-1. Set execution policy (Windows recommended): `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+**PowerShell (Windows):**
+
+1. Set execution policy: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
 2. Create, update, or transition: `New-JiraIssue.ps1`, `Update-JiraIssue.ps1`, or `Set-JiraTransition.ps1`
 3. Add comments as needed: `Add-JiraComment.ps1 -IssueKey "PROJ-123" -Body "Updated via automation"`
 4. Verify changes: `Get-JiraIssue.ps1 -IssueKey "PROJ-123" -Format Summary`
+
+**Bash (macOS / Linux):**
+
+1. Create, update, or transition: `new-jira-issue.sh`, `update-jira-issue.sh`, or `set-jira-transition.sh`
+2. Add comments as needed: `bash scripts/bash/add-jira-comment.sh --issue-key "PROJ-123" --body "Updated via automation"`
+3. Verify changes: `bash scripts/bash/get-jira-issue.sh --issue-key "PROJ-123" --format summary`
 
 ## Templates and References
 
@@ -218,7 +306,7 @@ The output is clean markdown that can be returned to the user directly — no JS
 | 403 Forbidden           | Insufficient permissions       | Check Jira project permissions for the service account             |
 | 404 Not Found           | Invalid issue key or project   | Verify issue key format and project existence                      |
 | 429 Too Many Requests   | Rate limited                   | Script handles automatically with backoff; reduce request volume   |
-| TLS/SSL error           | PowerShell using TLS 1.0       | Script pins TLS 1.2 automatically via `ServicePointManager`       |
+| TLS/SSL error           | TLS version mismatch           | PowerShell pins TLS 1.2 via `ServicePointManager`; bash uses `curl --tlsv1.2` |
 | BLOCKED: DELETE         | Attempted delete operation     | DELETE operations are permanently disabled by this skill           |
 | Missing `jirapat`       | `.env` file incomplete         | Add `jirapat=<PAT>` to `.env` or `credentials.env`                |
 | Invalid issue key       | Wrong format                   | Use uppercase `PROJECT-NUMBER` format (e.g., `PROJ-123`)          |

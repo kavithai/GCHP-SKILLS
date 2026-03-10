@@ -28,4 +28,4 @@ Do not modify these files:
 
 ## Enforcement
 
-These rules are enforced by a PreToolUse hook at .github/hooks/jira-safety.json. On Windows, the hook runs a PowerShell validation script (`Validate-JiraSafety.ps1`) that blocks violations before tool execution. On macOS/Linux, an equivalent Python-based bash script (`validate-jira-safety.sh`) provides the same enforcement. The hook operates as the fourth and fifth defense layers above the existing three-layer DELETE blocking in shared.psm1.
+These rules are enforced by a PreToolUse hook at .github/hooks/jira-safety.json. On Windows, the hook runs a PowerShell validation script (`Validate-JiraSafety.ps1`) that blocks violations before tool execution. On macOS/Linux, an equivalent Python-based bash script (`validate-jira-safety.sh`) provides the same enforcement. Together, the PreToolUse hook (fourth defense layer) and this workspace instructions file (fifth defense layer) sit above the existing three-layer DELETE blocking in `shared.psm1`.

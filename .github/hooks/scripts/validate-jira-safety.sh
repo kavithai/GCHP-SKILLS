@@ -37,8 +37,8 @@ def is_protected_file(path):
 
 try:
     hook_input = json.loads(input_json)
-except Exception:
-    allow()
+except json.JSONDecodeError:
+    deny("Invalid hook input: unable to parse JSON.")
 
 tool_name  = hook_input.get('tool_name', '')
 tool_input = hook_input.get('tool_input', {})

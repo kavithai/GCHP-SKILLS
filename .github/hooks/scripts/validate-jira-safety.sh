@@ -3,7 +3,15 @@
 # Mirrors the enforcement logic in Validate-JiraSafety.ps1.
 # Requires python3 (available by default on macOS and most Linux distributions).
 
-HOOK_INPUT="$(cat)" python3 << 'PYEOF'
+HOOK_INPUT="$(cat)"
+
+# Lightweight precheck to ensure python3 is available; if not, emit a deny decision.
+if ! command -v python3 >/dev/null 2>&1; then
+    echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"python3 is required to run validate-jira-safety.sh, but it is not available on this system. Please install python3 or run this hook in an environment where python3 is on PATH."}}'
+    exit 0
+fi
+
+HOOK_INPUT="$HOOK_INPUT" python3 << 'PYEOF'
 import sys, json, os, re
 
 input_json = os.environ.get('HOOK_INPUT', '')

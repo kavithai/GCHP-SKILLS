@@ -172,6 +172,35 @@ System.Collections.Hashtable
     return $credentials
 }
 
+function Get-JiraCurrentUser {
+    <#
+.SYNOPSIS
+Retrieves the current authenticated Jira user's account information.
+.DESCRIPTION
+Calls the /rest/api/2/myself endpoint to resolve the current user's
+account ID and display name. Useful for "assign to me" workflows where
+the caller does not know their Jira account ID.
+.PARAMETER Credentials
+Hashtable containing Jira credentials from Get-JiraCredentials.
+.OUTPUTS
+System.Collections.Hashtable with keys: accountId, displayName, emailAddress
+#>
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Credentials
+    )
+
+    $response = Invoke-JiraApi -Credentials $Credentials -Endpoint '/rest/api/2/myself' -Method 'Get'
+
+    return @{
+        accountId    = $response.accountId
+        displayName  = $response.displayName
+        emailAddress = $response.emailAddress
+    }
+}
+
 function New-JiraAuthHeaders {
     <#
 .SYNOPSIS
@@ -408,6 +437,7 @@ System.Object
                 Uri             = $fullUrl
                 Method          = $Method
                 Headers         = $headers
+                ContentType     = 'application/json'
                 UseBasicParsing = $true
                 ErrorAction     = 'Stop'
             }
@@ -636,6 +666,7 @@ Export-ModuleMember -Function @(
     'Write-SkillOutput',
     'Get-SanitizedErrorMessage',
     'Get-JiraCredentials',
+    'Get-JiraCurrentUser',
     'New-JiraAuthHeaders',
     'Test-JiraIssueKey',
     'ConvertTo-SafeJqlValue',

@@ -180,11 +180,14 @@ Provide either `-TransitionId` or `-TransitionName` to execute a transition. Use
 
 ### Set-JiraAssignee
 
-| Parameter | Flag          | Type   | Mandatory | Default  | Description                                     |
-|-----------|---------------|--------|-----------|----------|-------------------------------------------------|
-| Issue Key | `-IssueKey`   | string | Yes       | â€”        | Issue to assign                                 |
-| Assignee  | `-Assignee`   | string | No        | â€”        | Username or account ID to assign                |
-| Unassign  | `-Unassign`   | switch | No        | `$false` | Remove the current assignee                     |
+| Parameter    | Flag            | Type   | Mandatory | Default  | Description                                                     |
+|--------------|-----------------|--------|-----------|----------|-----------------------------------------------------------------|
+| Issue Key    | `-IssueKey`     | string | Yes       | —        | Issue to assign                                                 |
+| Assignee     | `-Assignee`     | string | No        | —        | Username or account ID to assign                                |
+| Assign To Me | `-AssignToMe`   | switch | No        | `$false` | Assign to the authenticated user (resolves account ID via API)  |
+| Unassign     | `-Unassign`     | switch | No        | `$false` | Remove the current assignee                                     |
+
+Provide exactly one of `-Assignee`, `-AssignToMe`, or `-Unassign`. When an agent needs to assign an issue to the current user, prefer `-AssignToMe` — it resolves the account ID automatically and avoids lookup errors.
 
 ## Workflow Pattern for Agents
 

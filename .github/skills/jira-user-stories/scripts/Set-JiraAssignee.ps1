@@ -4,8 +4,9 @@ Sets or clears the assignee on a Jira issue.
 
 .DESCRIPTION
 Updates the assignee field on a Jira issue. Use -Assignee to set a specific
-user (by username or account ID), or -Unassign to clear the current assignee.
-Exactly one of -Assignee or -Unassign must be specified.
+user (by username or account ID), -AssignToMe to assign to the authenticated
+user, or -Unassign to clear the current assignee.
+Exactly one of -Assignee, -AssignToMe, or -Unassign must be specified.
 
 .PARAMETER IssueKey
 The Jira issue key to update (e.g. MYPROJ-123).
@@ -13,11 +14,18 @@ The Jira issue key to update (e.g. MYPROJ-123).
 .PARAMETER Assignee
 Username or account ID to assign the issue to.
 
+.PARAMETER AssignToMe
+Switch to assign the issue to the currently authenticated user.
+Resolves the account ID automatically via the /rest/api/2/myself endpoint.
+
 .PARAMETER Unassign
 Switch to clear the current assignee from the issue.
 
 .EXAMPLE
 .\Set-JiraAssignee.ps1 -IssueKey 'MYPROJ-123' -Assignee 'jsmith'
+
+.EXAMPLE
+.\Set-JiraAssignee.ps1 -IssueKey 'MYPROJ-123' -AssignToMe
 
 .EXAMPLE
 .\Set-JiraAssignee.ps1 -IssueKey 'MYPROJ-123' -Unassign
@@ -29,6 +37,9 @@ param(
 
     [Parameter()]
     [string]$Assignee,
+
+    [Parameter()]
+    [switch]$AssignToMe,
 
     [Parameter()]
     [switch]$Unassign
@@ -44,31 +55,49 @@ if ($MyInvocation.InvocationName -ne '.') {
             throw "Invalid issue key '$IssueKey'. Expected format: PROJ-123."
         }
 
-        # Require either -Assignee or -Unassign
+        # Require exactly one of -Assignee, -AssignToMe, or -Unassign
         $hasAssignee = $PSBoundParameters.ContainsKey('Assignee') -and -not [string]::IsNullOrWhiteSpace($Assignee)
+        $hasAssignToMe = $AssignToMe.IsPresent
         $hasUnassign = $Unassign.IsPresent
 
-        if (-not $hasAssignee -and -not $hasUnassign) {
-            throw "Either -Assignee or -Unassign must be specified."
+        $optionCount = @($hasAssignee, $hasAssignToMe, $hasUnassign).Where({ $_ }).Count
+        if ($optionCount -eq 0) {
+            throw "One of -Assignee, -AssignToMe, or -Unassign must be specified."
         }
-
-        if ($hasAssignee -and $hasUnassign) {
-            throw "Cannot use both -Assignee and -Unassign at the same time."
+        if ($optionCount -gt 1) {
+            throw "Only one of -Assignee, -AssignToMe, or -Unassign can be specified at a time."
         }
 
         # Load credentials
         $creds = Get-JiraCredentials
 
+        # Resolve -AssignToMe to an account ID
+        if ($hasAssignToMe) {
+            Write-SkillOutput -Title 'Assignee' -Message "Resolving current user..."
+            $currentUser = Get-JiraCurrentUser -Credentials $creds
+            $Assignee = $currentUser.accountId
+            $hasAssignee = $true
+            Write-SkillOutput -Title 'Assignee' -Message "Resolved to '$($currentUser.displayName)' ($Assignee)."
+        }
+
         # Build assignee body
+        # Jira Cloud requires 'accountId'; Jira Server/DC uses 'name'.
+        # Detect Cloud by checking if jiraauthtype is 'Basic' or URL contains atlassian.net
+        $isCloud = ($creds['jiraauthtype'] -eq 'Basic') -or ($creds['jiraurl'] -match 'atlassian\.net')
+
         if ($hasUnassign) {
-            $assigneeBody = @{
-                name = $null
+            if ($isCloud) {
+                $assigneeBody = @{ accountId = $null }
+            } else {
+                $assigneeBody = @{ name = $null }
             }
             $actionDescription = 'Unassigning'
         }
         else {
-            $assigneeBody = @{
-                name = $Assignee
+            if ($isCloud) {
+                $assigneeBody = @{ accountId = $Assignee }
+            } else {
+                $assigneeBody = @{ name = $Assignee }
             }
             $actionDescription = "Assigning to '$Assignee'"
         }

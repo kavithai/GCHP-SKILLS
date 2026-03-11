@@ -53,3 +53,24 @@ jiraauthtype=Basic
 * Check `$LASTEXITCODE` after each script run.
 * `0` means success and `1` means failure.
 * DELETE operations are blocked by design and not supported.
+
+## Limitations
+
+| Area                    | Scope    | Limitation                                                                                         |
+|-------------------------|----------|----------------------------------------------------------------------------------------------------|
+| API version             | Skill    | Only Jira REST API v2 is supported; v3 (Jira Cloud next-gen) endpoints are not available           |
+| HTTP methods            | Skill    | Only GET, POST, and PUT are allowed; DELETE is permanently blocked at three independent layers      |
+| Pagination              | Skill    | Search results are capped at 500 issues even with `-All`; larger result sets require external tools |
+| Attachments             | Skill    | No support for uploading, downloading, or managing file attachments                                |
+| Sprints and boards      | Skill    | No direct sprint or board management; Agile-specific endpoints are not exposed                     |
+| Bulk operations         | Skill    | No batch create, update, or transition; each issue must be handled individually                    |
+| Webhooks                | Skill    | No webhook registration or event-driven workflows                                                  |
+| Issue linking           | Skill    | No support for creating or managing issue links between Jira issues                                |
+| Watchers                | Skill    | No support for adding, removing, or listing issue watchers                                         |
+| Work logs               | Skill    | No support for logging or retrieving time-tracking entries                                          |
+| Components and versions | Skill    | No support for managing project components or fix versions                                          |
+| Rich text editing       | REST API | Descriptions and comments use plain text or wiki markup only; ADF (Atlassian Document Format) requires API v3 |
+| Permissions discovery   | Skill    | No built-in check for user permissions before attempting operations                                |
+| OAuth                   | Skill    | Only Bearer PAT and Basic Auth are supported; OAuth 2.0 flows are not implemented                  |
+| Rate limiting           | REST API | Jira enforces per-user rate limits; the skill retries on 429 responses but cannot increase quotas  |
+| Field validation        | REST API | Custom field IDs and allowed values are instance-specific; the skill does not pre-validate them    |

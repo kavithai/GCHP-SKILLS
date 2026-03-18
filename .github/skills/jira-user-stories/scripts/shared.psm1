@@ -494,6 +494,107 @@ System.Object
     }
 }
 
+function Invoke-PreToolHook {
+    <#
+.SYNOPSIS
+Pre-execution hook that blocks irreversible Jira operations.
+.DESCRIPTION
+Validates an intended Jira operation before any credentials are loaded or
+API requests are made. Blocks DELETE HTTP methods, named destructive
+operations (DeleteIssue, DeleteProject, DeleteEpic, etc.), and POST
+requests to known bulk-destructive endpoints. Must be called at the
+entry point of every write-operation script.
+Throws a terminating error if the operation is blocked; returns normally
+if the operation is allowed.
+.PARAMETER Operation
+The logical operation name (e.g. 'CreateIssue', 'UpdateIssue',
+'DeleteIssue'). Used to match against the blocked-operation list and
+recorded in the audit log.
+.PARAMETER Method
+The HTTP method the operation intends to use (Get, Post, Put, Delete).
+Any value of Delete is blocked unconditionally.
+.PARAMETER Endpoint
+The Jira REST API endpoint path (e.g. '/rest/api/2/issue/PROJ-123').
+Used to match against destructive endpoint patterns.
+.PARAMETER IssueKey
+Optional Jira issue key for audit log context.
+.PARAMETER IssueType
+Optional issue type (e.g. Story, Epic) for audit log context.
+.OUTPUTS
+System.Void
+#>
+    [CmdletBinding()]
+    [OutputType([void])]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Operation,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Method,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Endpoint,
+
+        [Parameter()]
+        [string]$IssueKey,
+
+        [Parameter()]
+        [string]$IssueType
+    )
+
+    $normalizedMethod = $Method.Trim().ToUpperInvariant()
+
+    # Layer 1: Block DELETE HTTP method unconditionally.
+    # Covers deletion of user stories, epics, projects, comments, attachments, and
+    # any other resource reachable via the Jira REST API.
+    if ($normalizedMethod -eq 'DELETE') {
+        $msg = "PRETOOL HOOK BLOCKED: DELETE operations are permanently disabled. " +
+               "Operation '$Operation' on endpoint '$Endpoint' is irreversible and " +
+               "cannot be executed by this skill."
+        Write-AuditLog -Operation "PRETOOL_BLOCKED:$Operation" -IssueKey $IssueKey -Details $msg
+        throw $msg
+    }
+
+    # Layer 2: Block by explicit operation name.
+    # Catches callers that pass a destructive operation name regardless of method.
+    $blockedOperationNames = @(
+        'DeleteIssue',
+        'DeleteComment',
+        'DeleteProject',
+        'DeleteEpic',
+        'DeleteAttachment',
+        'DeleteSprint',
+        'DeleteBoard',
+        'BulkDelete',
+        'PurgeIssue',
+        'ArchiveProject',
+        'BulkArchive',
+        'BulkDestroy'
+    )
+
+    foreach ($blocked in $blockedOperationNames) {
+        if ($Operation -ieq $blocked) {
+            $msg = "PRETOOL HOOK BLOCKED: '$Operation' is an irreversible operation " +
+                   "and is permanently disabled by this skill."
+            Write-AuditLog -Operation "PRETOOL_BLOCKED:$Operation" -IssueKey $IssueKey -Details $msg
+            throw $msg
+        }
+    }
+
+    # Layer 3: Block POST to known bulk-destructive endpoints.
+    # Jira's bulk-delete endpoint accepts POST with a list of issue IDs.
+    if ($normalizedMethod -eq 'POST' -and $Endpoint -imatch '^/?rest/api/2/issue/bulk') {
+        $msg = "PRETOOL HOOK BLOCKED: Bulk issue operations on endpoint '$Endpoint' " +
+               "are not permitted by this skill."
+        Write-AuditLog -Operation "PRETOOL_BLOCKED:$Operation" -IssueKey $IssueKey -Details $msg
+        throw $msg
+    }
+
+    # Operation is allowed — record in audit log for traceability.
+    Write-AuditLog -Operation "PRETOOL_ALLOWED:$Operation" -IssueKey $IssueKey `
+        -Details "Pre-tool hook passed: $Method $Endpoint"
+}
+
 function Write-AuditLog {
     <#
 .SYNOPSIS
@@ -672,6 +773,7 @@ Export-ModuleMember -Function @(
     'ConvertTo-SafeJqlValue',
     'Test-JiraUrl',
     'Invoke-JiraApi',
+    'Invoke-PreToolHook',
     'Write-AuditLog',
     'Format-JiraIssueSummary',
     'Format-JiraSearchSummary'

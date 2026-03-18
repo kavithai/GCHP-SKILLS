@@ -70,6 +70,9 @@ Import-Module (Join-Path $PSScriptRoot 'shared.psm1') -Force
 
 if ($MyInvocation.InvocationName -ne '.') {
     try {
+        # Pretool hook: guard against irreversible operations before any credentials are loaded
+        Invoke-PreToolHook -Operation 'CreateIssue' -Method 'Post' -Endpoint '/rest/api/2/issue'
+
         # Validate Summary is not empty/whitespace
         if ([string]::IsNullOrWhiteSpace($Summary)) {
             throw "Summary must not be empty or whitespace."

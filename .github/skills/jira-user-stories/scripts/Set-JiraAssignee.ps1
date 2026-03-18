@@ -68,6 +68,10 @@ if ($MyInvocation.InvocationName -ne '.') {
             throw "Only one of -Assignee, -AssignToMe, or -Unassign can be specified at a time."
         }
 
+        # Pretool hook: guard against irreversible operations before any credentials are loaded
+        Invoke-PreToolHook -Operation 'SetAssignee' -Method 'Put' `
+            -Endpoint "/rest/api/2/issue/$IssueKey/assignee" -IssueKey $IssueKey
+
         # Load credentials
         $creds = Get-JiraCredentials
 

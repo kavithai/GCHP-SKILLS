@@ -97,6 +97,10 @@ if ($MyInvocation.InvocationName -ne '.') {
             throw "Either -TransitionId or -TransitionName must be specified (or use -ListTransitions to see available options)."
         }
 
+        # Pretool hook: guard against irreversible operations before any credentials are loaded
+        Invoke-PreToolHook -Operation 'Transition' -Method 'Post' `
+            -Endpoint "/rest/api/2/issue/$IssueKey/transitions" -IssueKey $IssueKey
+
         # Resolve TransitionName to TransitionId if needed
         $resolvedId = $TransitionId
         if ($PSBoundParameters.ContainsKey('TransitionName') -and $TransitionName) {

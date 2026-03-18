@@ -22,6 +22,7 @@ Provides Jira issue management capabilities through PowerShell scripts that inte
 | Add comment        | Add-JiraComment.ps1     | POST        | /rest/api/2/issue/{key}/comment       |
 | Transition status  | Set-JiraTransition.ps1  | POST        | /rest/api/2/issue/{key}/transitions   |
 | Assign issue       | Set-JiraAssignee.ps1    | PUT         | /rest/api/2/issue/{key}/assignee      |
+| **Pre-tool check** | **Invoke-PreToolHook.ps1** | n/a      | n/a (runs before API calls)           |
 
 ## Prerequisites
 
@@ -88,22 +89,36 @@ These rules prevent slow multi-turn agent execution. Violations waste user time 
 
 ### Blocked Operations
 
-| Blocked Operation | HTTP Method | Why                         |
-|-------------------|-------------|-----------------------------|
-| Delete issue      | DELETE      | Permanent data loss         |
-| Delete comment    | DELETE      | Permanent data loss         |
-| Delete project    | DELETE      | Entire project destruction  |
-| Delete attachment | DELETE      | Permanent data loss         |
+| Blocked Operation       | HTTP Method | Why                                    |
+|-------------------------|-------------|----------------------------------------|
+| Delete issue            | DELETE      | Permanent data loss                    |
+| Delete comment          | DELETE      | Permanent data loss                    |
+| Delete project          | DELETE      | Entire project destruction             |
+| Delete epic             | DELETE      | Permanent data loss                    |
+| Delete attachment       | DELETE      | Permanent data loss                    |
+| Delete sprint / board   | DELETE      | Permanent data loss                    |
+| Bulk delete issues      | POST        | Mass irreversible data loss            |
 
-### Three-Layer DELETE Blocking
+### Four-Layer Irreversible-Operation Blocking
 
-DELETE operations are blocked at three independent layers to prevent accidental or deliberate data destruction:
+Irreversible operations are blocked at four independent layers:
 
-1. `Invoke-JiraApi` validates the `-Method` parameter using `[ValidateSet('Get', 'Post', 'Put')]`, rejecting DELETE at the parameter binding level.
-2. A runtime guard inside `Invoke-JiraApi` checks the method string and throws before any HTTP request is made.
-3. No script in this skill constructs a DELETE request. No code path exists to reach a DELETE call.
+1. **Pretool hook — entry-point guard (`Invoke-PreToolHook`).** Every write script calls `Invoke-PreToolHook` before loading credentials or making any API request. The hook blocks: any DELETE HTTP method, named destructive operations (`DeleteIssue`, `DeleteProject`, `DeleteEpic`, `DeleteComment`, `DeleteAttachment`, `DeleteSprint`, `DeleteBoard`, `BulkDelete`, `PurgeIssue`, `ArchiveProject`, `BulkArchive`, `BulkDestroy`), and POST requests to known bulk-destructive endpoints (`/rest/api/2/issue/bulk`). Every blocked attempt is written to the audit log.
+2. `Invoke-JiraApi` validates the `-Method` parameter using `[ValidateSet('Get', 'Post', 'Put')]`, rejecting DELETE at the parameter binding level.
+3. A runtime guard inside `Invoke-JiraApi` checks the method string and throws before any HTTP request is made.
+4. No script in this skill constructs a DELETE request. No code path exists to reach a DELETE call.
 
-All three layers must be bypassed simultaneously for a DELETE to succeed, which requires modifying the source code itself.
+All four layers must be bypassed simultaneously for a destructive operation to succeed, which requires modifying the source code itself.
+
+The standalone `Invoke-PreToolHook.ps1` can also be called directly by an agent pipeline to validate an operation before choosing which script to invoke:
+
+    powershell -ExecutionPolicy Bypass -File "$sd/Invoke-PreToolHook.ps1" `
+        -Operation DeleteIssue -Method Delete -Endpoint "/rest/api/2/issue/PROJ-1"
+    # Exits 1 — BLOCKED
+
+    powershell -ExecutionPolicy Bypass -File "$sd/Invoke-PreToolHook.ps1" `
+        -Operation CreateIssue -Method Post -Endpoint "/rest/api/2/issue"
+    # Exits 0 — ALLOWED
 
 ### Empty Field Protection
 
@@ -179,5 +194,6 @@ Do NOT add a third command. If the write failed, report the error — do not ret
 | 429 Too Many Requests   | Rate limited                   | Script handles automatically with backoff; reduce request volume   |
 | TLS/SSL error           | PowerShell using TLS 1.0       | Script pins TLS 1.2 automatically via `ServicePointManager`       |
 | BLOCKED: DELETE         | Attempted delete operation     | DELETE operations are permanently disabled by this skill           |
+| PRETOOL HOOK BLOCKED    | Attempted irreversible op      | The operation name or HTTP method is in the blocked list; no alternative exists — the operation is permanently disabled |
 | Missing `jirapat`       | `.env` file incomplete         | Add `jirapat=<PAT>` to `.env` or `credentials.env`                |
 | Invalid issue key       | Wrong format                   | Use uppercase `PROJECT-NUMBER` format (e.g., `PROJ-123`)          |

@@ -45,6 +45,10 @@ if ($MyInvocation.InvocationName -ne '.') {
             throw "Invalid issue key '$IssueKey'. Expected format: PROJ-123."
         }
 
+        # Pretool hook: guard against irreversible operations before any credentials are loaded
+        Invoke-PreToolHook -Operation 'AddComment' -Method 'Post' `
+            -Endpoint "/rest/api/2/issue/$IssueKey/comment" -IssueKey $IssueKey
+
         # Validate body is not empty/whitespace
         if ([string]::IsNullOrWhiteSpace($Body)) {
             throw "Comment body must not be empty or whitespace."

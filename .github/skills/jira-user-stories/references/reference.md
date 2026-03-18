@@ -24,21 +24,55 @@ estimated_reading_time: 8
 | Add-JiraComment.ps1     | POST        | /rest/api/2/issue/{key}/comment     | Add a comment to an issue                |
 | Set-JiraTransition.ps1  | GET / POST  | /rest/api/2/issue/{key}/transitions | List or execute a status transition      |
 | Set-JiraAssignee.ps1    | PUT         | /rest/api/2/issue/{key}/assignee    | Assign or unassign an issue              |
+| Invoke-PreToolHook.ps1  | n/a         | n/a                                 | Pre-execution safety check (no API call) |
 
 ## Blocked Operations
 
-| Operation         | HTTP Method | Reason                                                                 |
-|-------------------|-------------|------------------------------------------------------------------------|
-| Delete issue      | DELETE      | Permanent, irreversible data loss                                      |
-| Delete comment    | DELETE      | Permanent, irreversible data loss                                      |
-| Delete project    | DELETE      | Destroys an entire project and all associated issues                   |
-| Delete attachment | DELETE      | Permanent file removal with no recovery                                |
+| Operation               | HTTP Method | Reason                                                                 |
+|-------------------------|-------------|------------------------------------------------------------------------|
+| Delete issue            | DELETE      | Permanent, irreversible data loss                                      |
+| Delete comment          | DELETE      | Permanent, irreversible data loss                                      |
+| Delete project          | DELETE      | Destroys an entire project and all associated issues                   |
+| Delete epic             | DELETE      | Permanent, irreversible data loss                                      |
+| Delete attachment       | DELETE      | Permanent file removal with no recovery                                |
+| Delete sprint / board   | DELETE      | Permanent, irreversible data loss                                      |
+| Bulk delete issues      | POST        | Mass irreversible data loss via `/rest/api/2/issue/bulk`               |
 
-DELETE is blocked at three independent layers:
+Irreversible operations are blocked at four independent layers:
 
-1. `[ValidateSet('Get', 'Post', 'Put')]` on the `-Method` parameter rejects DELETE at bind time.
-2. A runtime guard inside `Invoke-JiraApi` checks the method and throws before any HTTP request.
-3. No script in the skill constructs or invokes a DELETE request.
+1. **Pretool hook (`Invoke-PreToolHook` / `Invoke-PreToolHook.ps1`).** Runs at the entry point of every write script — before credentials are loaded. Blocks DELETE method, named destructive operations, and bulk-delete POST endpoints. Records every blocked attempt in the audit log.
+2. `[ValidateSet('Get', 'Post', 'Put')]` on the `-Method` parameter rejects DELETE at bind time.
+3. A runtime guard inside `Invoke-JiraApi` checks the method and throws before any HTTP request.
+4. No script in the skill constructs or invokes a DELETE request.
+
+### Pretool Hook — `Invoke-PreToolHook`
+
+**Function signature (from `shared.psm1`):**
+
+| Parameter   | Type   | Required | Description                                       |
+|-------------|--------|----------|---------------------------------------------------|
+| Operation   | string | Yes      | Logical operation name (e.g. `DeleteIssue`)       |
+| Method      | string | Yes      | HTTP method (`Get`, `Post`, `Put`, `Delete`)       |
+| Endpoint    | string | Yes      | REST API path (e.g. `/rest/api/2/issue/PROJ-1`)   |
+| IssueKey    | string | No       | Jira issue key for audit log context              |
+| IssueType   | string | No       | Issue type for audit log context                  |
+
+**Blocked operation names:**
+
+`DeleteIssue`, `DeleteComment`, `DeleteProject`, `DeleteEpic`, `DeleteAttachment`,
+`DeleteSprint`, `DeleteBoard`, `BulkDelete`, `PurgeIssue`, `ArchiveProject`,
+`BulkArchive`, `BulkDestroy`
+
+**Blocked endpoint patterns:**
+
+`/rest/api/2/issue/bulk` (POST) — Jira bulk-delete endpoint
+
+**Exit codes (standalone script):**
+
+| Code | Meaning  |
+|------|----------|
+| 0    | Allowed  |
+| 1    | Blocked  |
 
 ## Authentication Reference
 

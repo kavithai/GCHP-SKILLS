@@ -1,4 +1,4 @@
----
+﻿---
 name: jira-user-stories
 description: 'Jira user story management skill for reading, creating, updating, and transitioning issues via Jira REST API v2. USE FOR: Jira issue search, story creation, status updates, field editing, comment management, issue assignment, JQL queries, sprint tracking. Works with PowerShell 5.1+ on Windows. Supports both Jira Cloud (Basic Auth) and Data Center (Bearer PAT). Enforces strict safety guardrails: no DELETE operations, HTTPS-only, TLS 1.2 pinned, credential masking.'
 user-invocable: true
@@ -32,41 +32,57 @@ Provides Jira issue management capabilities through PowerShell scripts that inte
 | Credentials | `.env` or `credentials.env` at workspace root with `jirapat=<PAT>` and `jiraurl=<URL>`    |
 | Optional    | `jiraemail=<email>` for Jira Cloud (Basic Auth), `jiraauthtype=Basic`                      |
 
-## Quick Start
+## Quick Start (Copy-Paste Ready)
 
-Retrieve a single issue with a clean, readable summary (recommended for agents):
+All examples assume `$sd` is set to the scripts directory. Set it once per session:
 
-    powershell -ExecutionPolicy Bypass -File scripts/Get-JiraIssue.ps1 -IssueKey "MYPROJ-123" -Format Summary
+    $sd = "<workspace>/.github/skills/jira-user-stories/scripts"
 
-Search for issues and get a formatted table:
+Retrieve a single issue (recommended — one command, clean output):
 
-    powershell -ExecutionPolicy Bypass -File scripts/Search-JiraIssues.ps1 -Jql "project = MYPROJ AND status = 'To Do'" -MaxResults 10 -Format Summary
+    powershell -ExecutionPolicy Bypass -File "$sd/Get-JiraIssue.ps1" -IssueKey "MYPROJ-123" -Format Summary
 
-Retrieve raw JSON (for programmatic use):
+Search for issues:
 
-    powershell -ExecutionPolicy Bypass -File scripts/Get-JiraIssue.ps1 -IssueKey "MYPROJ-123"
+    powershell -ExecutionPolicy Bypass -File "$sd/Search-JiraIssues.ps1" -Jql "project = MYPROJ AND status = 'To Do'" -MaxResults 10 -Format Summary
 
 Create a new user story:
 
-    powershell -ExecutionPolicy Bypass -File scripts/New-JiraIssue.ps1 -ProjectKey "MYPROJ" -Summary "New user story" -IssueType "Story"
+    powershell -ExecutionPolicy Bypass -File "$sd/New-JiraIssue.ps1" -ProjectKey "MYPROJ" -Summary "New user story" -IssueType "Story"
 
-Transition an issue to a new status:
+Transition an issue:
 
-    powershell -ExecutionPolicy Bypass -File scripts/Set-JiraTransition.ps1 -IssueKey "MYPROJ-123" -TransitionName "In Progress"
+    powershell -ExecutionPolicy Bypass -File "$sd/Set-JiraTransition.ps1" -IssueKey "MYPROJ-123" -TransitionName "In Progress"
 
 ## Agent Execution Rules (Required)
 
 When using this skill from an agent runtime:
 
+* **Resolve `$SKILL_DIR` first.** Before running any script, resolve the skill directory path once per session:
+  * `$SKILL_DIR` = the directory containing this SKILL.md file (the `.github/skills/jira-user-stories` path within the workspace).
+  * Scripts live at `$SKILL_DIR/scripts/<script>.ps1`.
+  * Do NOT explore the filesystem to find the scripts. Use the known path directly.
 * For maximum Windows compatibility, run scripts via:
-  * `powershell -ExecutionPolicy Bypass -File scripts/<script>.ps1`
+  * `powershell -ExecutionPolicy Bypass -File "$SKILL_DIR/scripts/<script>.ps1"`
   * or set once per terminal: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
-* On PowerShell 7+ (including non-Windows), use `pwsh -File scripts/<script>.ps1`.
+* On PowerShell 7+ (including non-Windows), use `pwsh -File "$SKILL_DIR/scripts/<script>.ps1"`.
 * Always check exit codes (`$LASTEXITCODE`) after script execution. Exit code 0 indicates success; exit code 1 indicates failure.
-* **Prefer `-Format Summary`** for read operations (`Get-JiraIssue.ps1`, `Search-JiraIssues.ps1`). This returns a concise markdown summary that can be shown to the user directly — no JSON parsing needed.
-* Use default JSON format (`-Format Json` or omit the flag) only when programmatic field extraction is required.
+* **Always use `-Format Summary`** for read operations (`Get-JiraIssue.ps1`, `Search-JiraIssues.ps1`). This returns clean markdown output — no JSON parsing needed. Only use `-Format Json` when the user explicitly requests raw data.
 * When using JSON format, parse output from stdout. All scripts emit JSON via `ConvertTo-Json -Depth 10`.
 * Use `ConvertTo-SafeJqlValue` from `shared.psm1` when constructing JQL with user-supplied values to prevent injection.
+
+## Agent Efficiency Rules (Required — Anti-Cycle)
+
+These rules prevent slow multi-turn agent execution. Violations waste user time and tokens.
+
+1. **One command, one turn.** Chain execution-policy setup and script invocation into a single terminal command. Do NOT split them across multiple turns.
+2. **Scripts handle credentials internally.** Do NOT manually search for, read, or parse `.env` or `credentials.env`. The scripts auto-load credentials from the workspace root via `Get-JiraCredentials` in `shared.psm1`.
+3. **Scripts handle path resolution internally.** Do NOT `cd` into the scripts directory, check if `shared.psm1` exists, or list directory contents. Just invoke the script by its full path.
+4. **Do NOT retry on credential errors.** If a 401/403 occurs, report the error to the user. Do NOT re-run the same command hoping it will work.
+5. **Do NOT retry on API errors more than once.** If a script fails, check the error message. If the issue is clear (wrong key, missing field), fix the input. If the error is transient (429, 5xx), retry once. If it fails again, report to the user.
+6. **Do NOT explore the skill directory.** The scripts, their parameters, and their behavior are fully documented in this file and `references/reference.md`. Do NOT list or read script files to discover parameters.
+7. **Maximum two turns per operation.** A single Jira operation (read, create, update) should complete in at most two terminal commands: one to run the script, one optional verification. If you find yourself on a third command for the same operation, stop and report the issue.
+8. **Detailed parameter docs are in `references/reference.md`.** Only consult parameter tables below for the most common flags. For advanced parameters, read the reference file.
 
 ## Safety Policy (Mandatory)
 
@@ -113,100 +129,40 @@ Two authentication modes are supported, controlled by the `jiraauthtype` value i
 
 When `jiraauthtype` is omitted or set to `Bearer`, the skill sends a `Bearer <PAT>` authorization header. When set to `Basic`, the skill constructs a `Basic <base64(email:token)>` header. Jira Cloud API tokens are passed in the `jirapat` field.
 
-## Parameters Reference
+## Common Parameters (Quick Reference)
 
-### Get-JiraIssue
+For the full parameter reference for all scripts, see `references/reference.md`.
 
-| Parameter         | Flag               | Type     | Mandatory | Default | Description                                              |
-|-------------------|---------------------|----------|-----------|---------|----------------------------------------------------------|
-| Issue Key         | `-IssueKey`        | string   | Yes       | â€”       | Jira issue key (e.g., `PROJ-123`)                        |
-| Fields            | `-Fields`          | string[] | No        | All     | Specific fields to retrieve                              |
-| Include Comments  | `-IncludeComments` | switch   | No        | `$false`| Also retrieve comments for the issue                     |
-| Expand            | `-Expand`          | string[] | No        | â€”       | Expand options (`renderedFields`, `changelog`, etc.)     || Format            | `-Format`          | string   | No        | `Json`  | Output format: `Json` (full API response) or `Summary` (clean markdown) |
-### Search-JiraIssues
-
-| Parameter    | Flag           | Type     | Mandatory | Default                                 | Description                                  |
-|--------------|----------------|----------|-----------|-----------------------------------------|----------------------------------------------|
-| JQL          | `-Jql`         | string   | Yes       | â€”                                       | JQL query string                             |
-| Fields       | `-Fields`      | string[] | No        | `summary,status,assignee,priority`      | Fields to return                             |
-| Max Results  | `-MaxResults`  | int      | No        | `50`                                    | Results per page (max 100)                   |
-| Start At     | `-StartAt`     | int      | No        | `0`                                     | Pagination offset                            |
-| All          | `-All`         | switch   | No        | `$false`                                | Paginate through all results (capped at 500) |
-| Format       | `-Format`      | string   | No        | `Json`                                  | Output format: `Json` (full response) or `Summary` (markdown table) |
-
-### New-JiraIssue
-
-| Parameter      | Flag             | Type      | Mandatory | Default | Description                                 |
-|----------------|------------------|-----------|-----------|---------|---------------------------------------------|
-| Project Key    | `-ProjectKey`    | string    | Yes       | â€”       | Jira project key (e.g., `MYPROJ`)           |
-| Summary        | `-Summary`       | string    | Yes       | â€”       | Issue summary/title (must not be empty)      |
-| Description    | `-Description`   | string    | No        | â€”       | Issue description                           |
-| Issue Type     | `-IssueType`     | string    | No        | `Story` | Issue type (`Story`, `Task`, `Bug`, `Epic`) |
-| Priority       | `-Priority`      | string    | No        | â€”       | Priority name (e.g., `High`, `Medium`)      |
-| Labels         | `-Labels`        | string[]  | No        | â€”       | Labels to apply                             |
-| Assignee       | `-Assignee`      | string    | No        | â€”       | Assignee username or account ID             |
-| Custom Fields  | `-CustomFields`  | hashtable | No        | â€”       | Custom fields as key-value pairs            |
-
-### Update-JiraIssue
-
-| Parameter      | Flag             | Type      | Mandatory | Default | Description                                      |
-|----------------|------------------|-----------|-----------|---------|--------------------------------------------------|
-| Issue Key      | `-IssueKey`      | string    | Yes       | â€”       | Jira issue key to update                         |
-| Summary        | `-Summary`       | string    | No        | â€”       | New summary (must not be blank if provided)      |
-| Description    | `-Description`   | string    | No        | â€”       | New description                                  |
-| Priority       | `-Priority`      | string    | No        | â€”       | New priority name                                |
-| Labels         | `-Labels`        | string[]  | No        | â€”       | New labels (replaces existing)                   |
-| Custom Fields  | `-CustomFields`  | hashtable | No        | â€”       | Custom fields to update                          |
-
-### Add-JiraComment
-
-| Parameter   | Flag           | Type      | Mandatory | Default | Description                                                        |
-|-------------|----------------|-----------|-----------|---------|--------------------------------------------------------------------|
-| Issue Key   | `-IssueKey`    | string    | Yes       | â€”       | Issue to comment on                                                |
-| Body        | `-Body`        | string    | Yes       | â€”       | Comment text (plain text or wiki markup)                           |
-| Visibility  | `-Visibility`  | hashtable | No        | â€”       | Visibility restriction (e.g., `@{type='role'; value='Developers'}`) |
-
-### Set-JiraTransition
-
-| Parameter        | Flag                | Type   | Mandatory | Default  | Description                                    |
-|------------------|---------------------|--------|-----------|----------|------------------------------------------------|
-| Issue Key        | `-IssueKey`         | string | Yes       | â€”        | Issue to transition                            |
-| Transition ID    | `-TransitionId`     | string | No        | â€”        | ID of the transition to execute                |
-| Transition Name  | `-TransitionName`   | string | No        | â€”        | Name of the transition (resolved to ID)        |
-| List Transitions | `-ListTransitions`  | switch | No        | `$false` | List available transitions instead of executing|
-| Comment          | `-Comment`          | string | No        | â€”        | Comment to add with the transition             |
-
-Provide either `-TransitionId` or `-TransitionName` to execute a transition. Use `-ListTransitions` to discover available transitions before executing one. When both `-TransitionName` and `-TransitionId` are omitted without `-ListTransitions`, the script throws an error.
-
-### Set-JiraAssignee
-
-| Parameter    | Flag            | Type   | Mandatory | Default  | Description                                                     |
-|--------------|-----------------|--------|-----------|----------|-----------------------------------------------------------------|
-| Issue Key    | `-IssueKey`     | string | Yes       | —        | Issue to assign                                                 |
-| Assignee     | `-Assignee`     | string | No        | —        | Username or account ID to assign                                |
-| Assign To Me | `-AssignToMe`   | switch | No        | `$false` | Assign to the authenticated user (resolves account ID via API)  |
-| Unassign     | `-Unassign`     | switch | No        | `$false` | Remove the current assignee                                     |
-
-Provide exactly one of `-Assignee`, `-AssignToMe`, or `-Unassign`. When an agent needs to assign an issue to the current user, prefer `-AssignToMe` — it resolves the account ID automatically and avoids lookup errors.
-
+| Script                  | Required Flags                          | Key Optional Flags                          |
+|-------------------------|------------------------------------------|---------------------------------------------|
+| Get-JiraIssue.ps1       | `-IssueKey "PROJ-123"`                  | `-Format Summary`, `-IncludeComments`       |
+| Search-JiraIssues.ps1   | `-Jql "<query>"`                        | `-Format Summary`, `-MaxResults 10`, `-All` |
+| New-JiraIssue.ps1       | `-ProjectKey "PROJ"`, `-Summary "text"` | `-IssueType`, `-Description`, `-Priority`   |
+| Update-JiraIssue.ps1    | `-IssueKey "PROJ-123"`                  | `-Summary`, `-Description`, `-Priority`     |
+| Add-JiraComment.ps1     | `-IssueKey "PROJ-123"`, `-Body "text"`  | `-Visibility`                               |
+| Set-JiraTransition.ps1  | `-IssueKey "PROJ-123"`                  | `-TransitionName`, `-ListTransitions`       |
+| Set-JiraAssignee.ps1    | `-IssueKey "PROJ-123"`                  | `-AssignToMe`, `-Assignee`, `-Unassign`     |
 ## Workflow Pattern for Agents
 
-### Read Operations (single command, no parsing needed)
+### Read Operations (one command total)
 
-Use `-Format Summary` to get clean, user-ready output in a single step:
+Chain execution-policy setup and script invocation in a single terminal command:
 
-1. Set execution policy (Windows recommended): `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
-2. Get issue summary: `Get-JiraIssue.ps1 -IssueKey "PROJ-123" -Format Summary`
-3. Search issues: `Search-JiraIssues.ps1 -Jql "project = PROJ AND status = 'To Do'" -Format Summary`
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; & "$sd/Get-JiraIssue.ps1" -IssueKey "PROJ-123" -Format Summary
 
-The output is clean markdown that can be returned to the user directly — no JSON parsing or field extraction required.
+The output is clean markdown — return it to the user directly. No JSON parsing, no second command.
 
-### Write Operations (standard workflow)
+### Write Operations (two commands max)
 
-1. Set execution policy (Windows recommended): `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
-2. Create, update, or transition: `New-JiraIssue.ps1`, `Update-JiraIssue.ps1`, or `Set-JiraTransition.ps1`
-3. Add comments as needed: `Add-JiraComment.ps1 -IssueKey "PROJ-123" -Body "Updated via automation"`
-4. Verify changes: `Get-JiraIssue.ps1 -IssueKey "PROJ-123" -Format Summary`
+1. Run the write script:
+
+       Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; & "$sd/New-JiraIssue.ps1" -ProjectKey "PROJ" -Summary "New story" -IssueType "Story"
+
+2. Optionally verify:
+
+       & "$sd/Get-JiraIssue.ps1" -IssueKey "PROJ-456" -Format Summary
+
+Do NOT add a third command. If the write failed, report the error — do not retry automatically.
 
 ## Templates and References
 
